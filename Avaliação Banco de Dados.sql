@@ -2,12 +2,9 @@ CREATE DATABASE EscolaDB
 
 USE EscolaDB
 
-CREATE TABLE Alunos(
-	Num_Aluno INT PRIMARY KEY,
-	Nome_Aluno VARCHAR(100),
-	SobreNome_Aluno VARCHAR(100),
-	id_Grade_Horaria INT
-	FOREIGN KEY (id_Grade_Horaria) REFERENCES Grade_Horaria(id_Grade_Horaria)
+CREATE TABLE Salas(
+	id_Sala INT PRIMARY KEY,
+	Materia VARCHAR(100)
 )
 
 CREATE TABLE Grade_Horaria(
@@ -17,16 +14,20 @@ CREATE TABLE Grade_Horaria(
 	Terceira_Aula VARCHAR(100)
 )
 
-CREATE TABLE Salas(
-	id_Sala INT PRIMARY KEY,
-	Materia VARCHAR(100)
+CREATE TABLE Alunos(
+	Num_Aluno INT PRIMARY KEY,
+	Nome_Aluno VARCHAR(100),
+	SobreNome_Aluno VARCHAR(100),
+	id_Grade_Horaria INT
+	FOREIGN KEY (id_Grade_Horaria) REFERENCES Grade_Horaria(id_Grade_Horaria)
 )
 
 CREATE TABLE Professores(
 	id_Professor INT PRIMARY KEY,
 	Nome_Professor VARCHAR(100),
 	SobreNome_Professor VARCHAR(100),
-	id_Sala INT
+	id_Sala INT,
+	Salario INT
 	FOREIGN KEY (id_Sala) REFERENCES Salas(id_Sala)
 )
 
@@ -39,8 +40,6 @@ CREATE TABLE Provas(
 	FOREIGN KEY (Num_Aluno) REFERENCES Alunos(Num_Aluno)
 )
 
-
-
 INSERT INTO Salas(id_Sala, Materia)
 VALUES
 	(1, 'Matemática'),
@@ -51,25 +50,15 @@ VALUES
 	(6, 'Química'),
 	(7, 'Física')
 
-INSERT INTO Professores(id_Professor, Nome_Professor, SobreNome_Professor, id_Sala)
+INSERT INTO Professores(id_Professor, Nome_Professor, SobreNome_Professor, id_Sala, salario)
 VALUES
-	(1, 'Gabriel', 'Carvalho', 2),
-	(2, 'Antonio', 'Pereira', 7),
-	(3, 'Daniel', 'Moraes', 4),
-	(4, 'Victor', 'Vieira', 6),
-	(5, 'Emerson', 'Pereira', 5),
-	(6, 'João', 'Carvalho', 1),
-	(7, 'Danilo', 'Moraes', 3)
-
-ALTER TABLE Professores
-ADD Salário INT
-
-UPDATE Professores
-SET Salário = 2200
-WHERE id_Professor = 3
-
-SELECT *
-FROM Professores
+	(1, 'Gabriel', 'Carvalho', 2, 2000),
+	(2, 'Antonio', 'Pereira', 7, 2500),
+	(3, 'Daniel', 'Moraes', 4, 2300),
+	(4, 'Victor', 'Vieira', 6, 2000),
+	(5, 'Emerson', 'Pereira', 5, 2700),
+	(6, 'João', 'Carvalho', 1, 3000),
+	(7, 'Danilo', 'Moraes', 3, 2900)
 
 INSERT INTO Grade_Horaria(id_Grade_Horaria, Primeira_Aula, Segunda_Aula, Terceira_Aula)
 VALUES
@@ -120,6 +109,7 @@ SELECT
 	Materia
 FROM Grade_Horaria G
 INNER JOIN Salas S ON S.Materia = G.Primeira_Aula
+GO
 
 --Seleciona as matérias da segunda aula
 CREATE OR ALTER VIEW VW_Segunda_aula
@@ -130,6 +120,7 @@ SELECT
 	Materia
 FROM Grade_Horaria G
 INNER JOIN Salas S ON S.Materia = G.Segunda_Aula
+GO
 
 --Seleciona as matérias da terceira aula
 CREATE OR ALTER VIEW VW_Terceira_aula
@@ -140,6 +131,7 @@ SELECT
 	Materia
 FROM Grade_Horaria G
 INNER JOIN Salas S ON S.Materia = G.Terceira_Aula
+GO
 
 SELECT *
 FROM VW_Primeira_aula
@@ -154,7 +146,8 @@ FROM VW_Terceira_aula
 --Subqueries
 SELECT 
 	Nome_Professor,
-	SobreNome_Professor
+	SobreNome_Professor,
+	id_Sala
 FROM Professores
 WHERE id_Sala IN (
 	SELECT
@@ -162,28 +155,17 @@ WHERE id_Sala IN (
 	FROM VW_Primeira_aula
 )
 
---CTEs
-WITH Reprovações_Aluno (id_Aluno, Qtd_Provas) AS
-	(SELECT
-		Num_Aluno,
-		COUNT(Status)
-	FROM Provas
-	WHERE Status = 'Reprovado'
-	GROUP BY Num_Aluno
-	)
-SELECT * FROM Reprovações_Aluno
-
 --Window Functions
 SELECT
 	id_Professor,
 	Nome_Professor,
-	Salário,
-	RANK() OVER (ORDER BY Salário DESC) AS Rank
+	Salario,
+	RANK() OVER (ORDER BY Salario DESC) AS Rank
 FROM Professores
---Agrupa os alunos caso eles possuam notas acima da média ou notas abaixo da média
+--Divide os alunos entre as melhores notas e as piores notas
 SELECT 
 	Num_Aluno,
-	AVG(Nota) média_da_nota,
+	AVG(Nota) média_das_notas,
 	NTILE(2) OVER(ORDER BY AVG(Nota) DESC) AS Grupo
 FROM Provas
 GROUP BY Num_Aluno
@@ -245,8 +227,8 @@ GO
 SELECT dbo.Provas_Reprovado(6) AS Provas_Abaixo_da_Média
 
 
---Triggers
-
+--Triggers e loop
+--Nova Coluna dos alunos que será atualizada sempre que uma prova for adicionada
 ALTER TABLE Alunos
 ADD Notas_Abaixo_da_Media INT
 
@@ -283,5 +265,28 @@ FROM Provas
 --checar se funciona
 INSERT INTO Provas(id_Prova, Materia, Num_Aluno, Nota)
 VALUES
-	(20, 'Física', 8, 2)
+	(19, 'Física', 7, 2)
 
+
+--CTEs
+WITH Reprovações_Aluno (id_Aluno, Qtd_Provas) AS
+	(SELECT
+		Num_Aluno,
+		COUNT(Status)
+	FROM Provas
+	WHERE Status = 'Reprovado'
+	GROUP BY Num_Aluno
+	)
+SELECT * FROM Reprovações_Aluno
+
+WITH Alunos_Aprovados_e_Reprovados (Nome_aluno, SobreNome_Aluno, Média, Grupo) AS
+	(SELECT
+		A.Nome_Aluno,
+		A.SobreNome_Aluno,
+		AVG(P.Nota),
+		NTILE(2) OVER(ORDER BY AVG(P.Nota) DESC) 
+	FROM Provas P
+	INNER JOIN Alunos A ON A.Num_Aluno = P.Num_Aluno
+	GROUP BY A.Nome_Aluno, A.SobreNome_Aluno)
+SELECT *
+FROM Alunos_Aprovados_e_Reprovados
